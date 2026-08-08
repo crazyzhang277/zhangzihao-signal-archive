@@ -25,6 +25,7 @@ const fallbackRepos = [
     name: "codex-antigravity-bridge",
     description: "Let Codex supervise Google Antigravity agents through MCP with scoped tasks, plan-driven workflows, and parallel Git worktrees.",
     html_url: "https://github.com/crazyzhang277/codex-antigravity-bridge",
+    default_branch: "main",
     homepage: "",
     language: "Python",
     stargazers_count: 0,
@@ -39,6 +40,7 @@ const fallbackRepos = [
     name: "zihao-personal-station",
     description: "Zhang Zihao personal geek station",
     html_url: "https://github.com/crazyzhang277/zihao-personal-station",
+    default_branch: "main",
     homepage: "",
     language: "TypeScript",
     stargazers_count: 0,
@@ -53,6 +55,7 @@ const fallbackRepos = [
     name: "zhangzihao-resume",
     description: "Personal resume website",
     html_url: "https://github.com/crazyzhang277/zhangzihao-resume",
+    default_branch: "gh-pages",
     homepage: "",
     language: "HTML",
     stargazers_count: 0,
@@ -67,6 +70,7 @@ const fallbackRepos = [
     name: "zeroaigen-auto-mention",
     description: "零一 AIGC AI 视频提示词 @主体标签 一键自动关联油猴扩展脚本",
     html_url: "https://github.com/crazyzhang277/zeroaigen-auto-mention",
+    default_branch: "master",
     homepage: "https://aigc.zeroaigen.cn",
     language: "JavaScript",
     stargazers_count: 0,
@@ -81,6 +85,7 @@ const fallbackRepos = [
     name: "520-Prank-Review",
     description: "520-Prank-Review",
     html_url: "https://github.com/crazyzhang277/520-Prank-Review",
+    default_branch: "main",
     homepage: "https://crazyzhang277.github.io/520-Prank-Review/",
     language: "HTML",
     stargazers_count: 0,
@@ -95,6 +100,7 @@ const fallbackRepos = [
     name: "SnapBatchPro",
     description: "一个简单的批量提取视频帧工具",
     html_url: "https://github.com/crazyzhang277/SnapBatchPro",
+    default_branch: "master",
     homepage: "",
     language: "Python",
     stargazers_count: 0,
@@ -108,12 +114,12 @@ const fallbackRepos = [
 ];
 
 const languageColors = {
-  Python: "#ef6e61",
-  TypeScript: "#335cff",
-  JavaScript: "#e8ad3f",
-  HTML: "#4cae8b",
-  CSS: "#9a75d1",
-  default: "#77756c",
+  Python: "#a63f37",
+  TypeScript: "#2d5eae",
+  JavaScript: "#b17a00",
+  HTML: "#006b6e",
+  CSS: "#6a4db5",
+  default: "#607286",
 };
 
 const state = {
@@ -235,13 +241,18 @@ function projectCard(repo, index, featured) {
   const language = repo.language || "Project";
   const cardClass = featured ? "featured-card" : "project-card";
   const description = repo.description || "这个仓库还没有公开简介，打开项目查看最新内容。";
+  const title = projectTitle(repo.name);
+  const detailLabel = (featured ? "打开精选项目详情：" : "打开项目详情：") + title;
   const starBadge = '<span class="project-signal" data-star-count="' + escapeHtml(repo.name) + '"><span class="star-glyph" aria-hidden="true">' + icons.star + '</span> ' + formatNumber(repo.stargazers_count) + "</span>";
   return '<article class="' + cardClass + '" data-reveal style="--delay:' + Math.min(index * 70, 210) + 'ms">' +
+    '<button class="card-hit-area" type="button" data-repo="' + escapeHtml(repo.name) + '" aria-label="' + escapeHtml(detailLabel) + '"></button>' +
+    '<div class="project-card-body">' +
     '<div class="project-card-top"><span class="project-index">' + String(index + 1).padStart(2, "0") + '</span><span class="language-label"><span class="language-dot" style="background:' + getLanguageColor(repo.language) + '"></span>' + escapeHtml(language) + "</span></div>" +
-    "<h3>" + escapeHtml(projectTitle(repo.name)) + "</h3>" +
+    "<h3>" + escapeHtml(title) + "</h3>" +
     "<p" + (featured ? "" : ' class="project-description"') + ">" + escapeHtml(description) + "</p>" +
     (featured ? "" : '<div class="project-tags">' + projectTags(repo) + "</div>") +
     '<div class="project-footer"><span>' + escapeHtml(formatDate(repo.pushed_at || repo.updated_at)) + starBadge + '</span><div class="project-footer-links"><button class="card-detail" type="button" data-repo="' + escapeHtml(repo.name) + '">详情 ' + icons.arrow + '</button><a class="project-link" href="' + escapeHtml(repo.html_url) + '" target="_blank" rel="noreferrer">GitHub ' + icons.external + '</a></div></div>' +
+    "</div>" +
     "</article>";
 }
 
@@ -366,43 +377,224 @@ function renderDialogActions(repo) {
   elements.dialogActions.innerHTML = links.join("");
 }
 
-function cleanReadme(raw) {
-  return String(raw || "")
-    .replace(/\x60\x60\x60[\s\S]*?\x60\x60\x60/g, "")
-    .replace(/!\[[^\]]*]\([^)]*\)/g, "")
-    .replace(/\[([^\]]+)]\([^)]*\)/g, "$1")
-    .replace(/^#{1,6}\s*/gm, "")
-    .replace(/^\s*[-*+]\s+/gm, "")
-    .replace(/[\x60*_>]/g, "")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim()
-    .slice(0, 1200);
+function sanitizeReadmeHtml(rawHtml) {
+  const root = document.createElement("div");
+  root.innerHTML = String(rawHtml || "");
+  const allowedTags = new Set([
+    "a", "blockquote", "br", "code", "del", "details", "div", "em", "h1", "h2", "h3", "h4", "h5", "h6",
+    "hr", "img", "li", "ol", "p", "pre", "s", "span", "strong", "summary", "sub", "sup", "table", "tbody", "td",
+    "th", "thead", "tr", "ul",
+  ]);
+  const allowedAttributes = new Set(["alt", "colspan", "href", "rowspan", "src", "start", "title"]);
+
+  root.querySelectorAll("*").forEach((element) => {
+    const tagName = element.tagName.toLowerCase();
+    if (!allowedTags.has(tagName)) {
+      while (element.firstChild) element.parentNode.insertBefore(element.firstChild, element);
+      element.remove();
+      return;
+    }
+    [...element.attributes].forEach((attribute) => {
+      const name = attribute.name.toLowerCase();
+      const value = attribute.value.trim();
+      const unsafeUrl = (name === "href" || name === "src") && /^(?:javascript|data|vbscript):/i.test(value);
+      if (!allowedAttributes.has(name) || name.startsWith("on") || unsafeUrl) element.removeAttribute(attribute.name);
+    });
+    if (tagName === "a") {
+      element.target = "_blank";
+      element.rel = "noopener noreferrer nofollow";
+    }
+    if (tagName === "img") {
+      element.loading = "lazy";
+      element.decoding = "async";
+    }
+  });
+  return root.innerHTML;
 }
 
-function renderReadme(raw) {
-  const cleaned = cleanReadme(raw);
+function readmeSafeUrl(value, repo, image = false) {
+  const target = String(value || "").trim();
+  if (!target || /^(?:javascript|data|vbscript):/i.test(target)) return "";
+  if (target.startsWith("#")) return target;
+  const branch = encodeURIComponent(repo.default_branch || "HEAD").replace(/%2F/gi, "/");
+  const base = image
+    ? "https://raw.githubusercontent.com/" + USERNAME + "/" + encodeURIComponent(repo.name) + "/" + branch + "/"
+    : "https://github.com/" + USERNAME + "/" + encodeURIComponent(repo.name) + "/blob/" + branch + "/";
+  try {
+    const url = new URL(target, base);
+    return ["http:", "https:"].includes(url.protocol) ? url.href : "";
+  } catch (error) {
+    return "";
+  }
+}
+
+function renderReadmeInline(value, repo) {
+  const tokens = [];
+  const stash = (html) => "\u0000" + (tokens.push(html) - 1) + "\u0000";
+  const rawImagePattern = new RegExp("<" + "img\\b[^>]*\\bsrc=[\\\"']([^\\\"']+)[\\\"'][^>]*>", "gi");
+  let text = String(value || "")
+    .replace(rawImagePattern, (match, source) => {
+      const safeSource = readmeSafeUrl(source, repo, true);
+      const alt = match.match(/\balt=["']([^"']*)["']/i)?.[1] || "";
+      return safeSource ? stash('<img src="' + escapeHtml(safeSource) + '" alt="' + escapeHtml(alt) + '" loading="lazy" decoding="async">') : "";
+    })
+    .replace(/<\/?(?:a|div|p|span|br)(?:\s[^>]*)?>/gi, (tag) => /<br\b/i.test(tag) ? "\n" : "")
+    .replace(/!\[([^\]]*)\]\(([^)\s]+)(?:\s+["'][^"']*["'])?\)/g, (match, alt, source) => {
+      const safeSource = readmeSafeUrl(source, repo, true);
+      return safeSource ? stash('<img src="' + escapeHtml(safeSource) + '" alt="' + escapeHtml(alt) + '" loading="lazy" decoding="async">') : escapeHtml(alt);
+    })
+    .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (match, label, href) => {
+      const safeHref = readmeSafeUrl(href, repo);
+      return safeHref ? stash('<a href="' + escapeHtml(safeHref) + '" target="_blank" rel="noopener noreferrer nofollow">' + escapeHtml(label) + "</a>") : escapeHtml(label);
+    });
+  text = escapeHtml(text)
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/__([^_]+)__/g, "<strong>$1</strong>")
+    .replace(/~~([^~]+)~~/g, "<del>$1</del>")
+    .replace(/\*([^*]+)\*/g, "<em>$1</em>")
+    .replace(/_([^_]+)_/g, "<em>$1</em>");
+  return text.replace(/\u0000(\d+)\u0000/g, (match, index) => tokens[Number(index)]);
+}
+
+function renderReadmeFallback(raw, repo) {
+  const lines = String(raw || "").replace(/\r/g, "").slice(0, 160000).split("\n");
+  const output = [];
+  let paragraph = [];
+  const flushParagraph = () => {
+    if (!paragraph.length) return;
+    output.push("<p>" + renderReadmeInline(paragraph.join("\n"), repo).replace(/\n/g, "<br>") + "</p>");
+    paragraph = [];
+  };
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    const fence = line.match(/^\s*(`{3,}|~{3,})\s*([\w+-]*)\s*$/);
+    if (fence) {
+      flushParagraph();
+      const codeLines = [];
+      index += 1;
+      while (index < lines.length && !new RegExp("^\\s*" + fence[1][0] + "{3,}\\s*$").test(lines[index])) {
+        codeLines.push(lines[index]);
+        index += 1;
+      }
+      const language = fence[2] ? ' class="language-' + escapeHtml(fence[2]) + '"' : "";
+      output.push("<pre><code" + language + ">" + escapeHtml(codeLines.join("\n")) + "</code></pre>");
+      continue;
+    }
+
+    const heading = line.match(/^\s{0,3}(#{1,6})\s+(.+?)\s*#*\s*$/);
+    if (heading) {
+      flushParagraph();
+      const level = heading[1].length;
+      output.push("<h" + level + ">" + renderReadmeInline(heading[2], repo) + "</h" + level + ">");
+      continue;
+    }
+
+    if (/^\s*((\*\s*){3,}|(-\s*){3,}|(_\s*){3,})$/.test(line)) {
+      flushParagraph();
+      output.push("<hr>");
+      continue;
+    }
+
+    if (/^\s*>\s?/.test(line)) {
+      flushParagraph();
+      const quoteLines = [];
+      while (index < lines.length && /^\s*>\s?/.test(lines[index])) {
+        quoteLines.push(lines[index].replace(/^\s*>\s?/, ""));
+        index += 1;
+      }
+      index -= 1;
+      output.push("<blockquote><p>" + renderReadmeInline(quoteLines.join("\n"), repo).replace(/\n/g, "<br>") + "</p></blockquote>");
+      continue;
+    }
+
+    const listItem = line.match(/^\s*(?:[-*+]\s+|\d+\.\s+)(.+)$/);
+    if (listItem) {
+      flushParagraph();
+      const ordered = /^\s*\d+\.\s+/.test(line);
+      const items = [];
+      while (index < lines.length) {
+        const item = lines[index].match(/^\s*(?:[-*+]\s+|\d+\.\s+)(.+)$/);
+        if (!item || /^\s*\d+\.\s+/.test(lines[index]) !== ordered) break;
+        items.push("<li>" + renderReadmeInline(item[1], repo) + "</li>");
+        index += 1;
+      }
+      index -= 1;
+      output.push("<" + (ordered ? "ol" : "ul") + ">" + items.join("") + "</" + (ordered ? "ol" : "ul") + ">");
+      continue;
+    }
+
+    if (!line.trim()) {
+      flushParagraph();
+      continue;
+    }
+    paragraph.push(line);
+  }
+  flushParagraph();
+  return output.join("");
+}
+
+function renderReadme(html) {
   elements.readmeContent.innerHTML = "";
-  if (!cleaned) {
+  const safeHtml = sanitizeReadmeHtml(html);
+  if (!safeHtml) {
     elements.readmeContent.innerHTML = "<p>这个项目还没有可读取的 README 内容。</p>";
     return;
   }
-  cleaned.split(/\n\n+/).slice(0, 5).forEach((paragraph) => {
-    const element = document.createElement("p");
-    element.textContent = paragraph.trim();
-    elements.readmeContent.appendChild(element);
-  });
+  elements.readmeContent.innerHTML = safeHtml;
 }
 
 async function loadReadme(repo) {
   elements.readmeState.textContent = "LOADING";
   elements.readmeContent.innerHTML = "<p>正在读取 README.md …</p>";
   try {
-    const response = await fetch(API_ROOT + "/repos/" + USERNAME + "/" + encodeURIComponent(repo.name) + "/readme", {
-      headers: { ...API_HEADERS, Accept: "application/vnd.github.raw+json" },
-    });
-    if (!response.ok) throw new Error("README unavailable");
-    renderReadme(await response.text());
-    elements.readmeState.textContent = "LIVE";
+    let rawMarkdown = "";
+    try {
+      const readmeResponse = await fetch(API_ROOT + "/repos/" + USERNAME + "/" + encodeURIComponent(repo.name) + "/readme", {
+        headers: { ...API_HEADERS, Accept: "application/vnd.github.raw+json" },
+      });
+      if (readmeResponse.ok) rawMarkdown = await readmeResponse.text();
+    } catch (error) {
+      // Continue with raw.githubusercontent.com when the API is unavailable or rate-limited.
+    }
+
+    if (!rawMarkdown.trim()) {
+      const branch = encodeURIComponent(repo.default_branch || "HEAD").replace(/%2F/gi, "/");
+      for (const filename of ["README.md", "readme.md", "Readme.md", "README.markdown", "readme.markdown"]) {
+        try {
+          const rawResponse = await fetch("https://raw.githubusercontent.com/" + USERNAME + "/" + encodeURIComponent(repo.name) + "/" + branch + "/" + filename);
+          if (rawResponse.ok) {
+            rawMarkdown = await rawResponse.text();
+            if (rawMarkdown.trim()) break;
+          }
+        } catch (error) {
+          // Try the next README filename when a raw host request fails.
+        }
+      }
+    }
+    if (!rawMarkdown.trim()) {
+      elements.readmeContent.innerHTML = "<p>这个项目没有 README 文件，可直接打开 GitHub 查看项目内容。</p>";
+      elements.readmeState.textContent = "NO README";
+      return;
+    }
+
+    try {
+      const markdownResponse = await fetch(API_ROOT + "/markdown", {
+        method: "POST",
+        headers: { ...API_HEADERS, Accept: "text/html", "Content-Type": "application/json" },
+        body: JSON.stringify({ text: rawMarkdown, mode: "gfm", context: USERNAME + "/" + repo.name }),
+      });
+      if (markdownResponse.ok) {
+        renderReadme(await markdownResponse.text());
+        elements.readmeState.textContent = "LIVE / GFM";
+        return;
+      }
+    } catch (error) {
+      // Fall back to the local renderer when GitHub Markdown is rate-limited or unavailable.
+    }
+    renderReadme(renderReadmeFallback(rawMarkdown, repo));
+    elements.readmeState.textContent = "LIVE / LOCAL";
   } catch (error) {
     elements.readmeContent.innerHTML = "<p>暂时无法读取 README，但你可以直接打开 GitHub 查看完整项目内容。</p>";
     elements.readmeState.textContent = "OPEN GITHUB";
