@@ -192,6 +192,12 @@ function formatNumber(value) {
   return new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(Number(value) || 0);
 }
 
+function parseStarCount(value) {
+  const match = String(value ?? "").trim().toLowerCase().replace(/,/g, "").match(/^(\d+(?:\.\d+)?)\s*([km])?$/);
+  if (!match) return NaN;
+  return Number(match[1]) * ({ k: 1000, m: 1000000 }[match[2]] || 1);
+}
+
 function formatCheckTime() {
   return new Intl.DateTimeFormat("zh-CN", { hour: "2-digit", minute: "2-digit" }).format(new Date());
 }
@@ -607,6 +613,23 @@ async function fetchJson(url) {
   return response.json();
 }
 
+async function fetchRepoStats(repo) {
+  try {
+    return {
+      data: await fetchJson(API_ROOT + "/repos/" + USERNAME + "/" + encodeURIComponent(repo.name)),
+      source: "GITHUB",
+    };
+  } catch (error) {
+    const badgeUrl = "https://img.shields.io/github/stars/" + USERNAME + "/" + encodeURIComponent(repo.name) + ".json";
+    const badgeResponse = await fetch(badgeUrl, { headers: { Accept: "application/json" } });
+    if (!badgeResponse.ok) throw error;
+    const badge = await badgeResponse.json();
+    const stargazersCount = parseStarCount(badge.value ?? badge.message);
+    if (!Number.isFinite(stargazersCount)) throw error;
+    return { data: { stargazers_count: stargazersCount }, source: "SHIELDS" };
+  }
+}
+
 async function refreshRepoStats(repo, silent = false) {
   if (!repo) return;
   if (!silent) {
@@ -614,23 +637,16 @@ async function refreshRepoStats(repo, silent = false) {
     elements.dialogStarStatus.textContent = "SYNCING";
   }
   try {
-    const freshRepo = await fetchJson(API_ROOT + "/repos/" + USERNAME + "/" + encodeURIComponent(repo.name));
-    Object.assign(repo, {
-      stargazers_count: freshRepo.stargazers_count,
-      forks_count: freshRepo.forks_count,
-      updated_at: freshRepo.updated_at,
-      pushed_at: freshRepo.pushed_at,
-    });
+    const { data: freshRepo, source } = await fetchRepoStats(repo);
+    Object.assign(repo, freshRepo);
     const storedRepo = state.repos.find((item) => item.name === repo.name);
     if (storedRepo && storedRepo !== repo) Object.assign(storedRepo, repo);
     renderDialogMeta(repo);
-    renderStarPanel(repo, "LIVE · CHECKED " + formatCheckTime());
+    renderStarPanel(repo, "LIVE · " + source + " · " + formatCheckTime());
     updateStarCountBadges(repo);
   } catch (error) {
-    if (!silent) {
-      renderStarPanel(repo, "OFFLINE · SNAPSHOT");
-      showToast("暂时无法连接 GitHub，当前显示的是缓存数据。");
-    }
+    renderStarPanel(repo, "OFFLINE · SNAPSHOT");
+    if (!silent) showToast("暂时无法连接 GitHub，当前显示的是缓存数据。");
   } finally {
     elements.refreshStars.classList.remove("is-loading");
   }
@@ -643,7 +659,7 @@ function stopStarPolling() {
 
 function startStarPolling(repo) {
   stopStarPolling();
-  refreshRepoStats(repo);
+  refreshRepoStats(repo, true);
   state.starPolling = window.setInterval(() => {
     if (!document.hidden && elements.projectDialog.open) refreshRepoStats(repo, true);
   }, 30000);
