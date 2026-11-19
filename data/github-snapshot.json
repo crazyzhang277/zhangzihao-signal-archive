@@ -1,0 +1,446 @@
+{
+  "generated_at": "2026-11-19T06:11:18Z",
+  "user": {
+    "login": "crazyzhang277",
+    "name": "crazyzhang",
+    "avatar_url": "https://avatars.githubusercontent.com/u/238443114?v=4",
+    "html_url": "https://github.com/crazyzhang277",
+    "bio": null,
+    "public_repos": 12,
+    "followers": 0,
+    "following": 2
+  },
+  "repos": [
+    {
+      "name": "short-drama-bgm",
+      "description": "本地短剧批量配背景音乐桌面工具（Electron）",
+      "html_url": "https://github.com/crazyzhang277/short-drama-bgm",
+      "default_branch": "main",
+      "homepage": "",
+      "language": "JavaScript",
+      "stargazers_count": 0,
+      "forks_count": 0,
+      "watchers_count": 0,
+      "open_issues_count": 0,
+      "topics": [],
+      "pushed_at": "2026-11-18T11:48:35Z",
+      "updated_at": "2026-11-12T03:34:53Z",
+      "created_at": "2026-11-04T15:43:35Z",
+      "fork": false,
+      "archived": false,
+      "license": "MIT"
+    },
+    {
+      "name": "zihao-personal-station",
+      "description": "Zhang Zihao personal geek station",
+      "html_url": "https://github.com/crazyzhang277/zihao-personal-station",
+      "default_branch": "main",
+      "homepage": "",
+      "language": "TypeScript",
+      "stargazers_count": 0,
+      "forks_count": 0,
+      "watchers_count": 0,
+      "open_issues_count": 0,
+      "topics": [],
+      "pushed_at": "2026-11-01T10:13:54Z",
+      "updated_at": "2026-11-01T10:13:58Z",
+      "created_at": "2026-07-31T10:43:34Z",
+      "fork": false,
+      "archived": false,
+      "license": "MIT"
+    },
+    {
+      "name": "short-drama-renamer",
+      "description": "Batch renamer for short-drama videos — native Win32 GUI, single exe",
+      "html_url": "https://github.com/crazyzhang277/short-drama-renamer",
+      "default_branch": "main",
+      "homepage": "",
+      "language": "C++",
+      "stargazers_count": 0,
+      "forks_count": 0,
+      "watchers_count": 0,
+      "open_issues_count": 0,
+      "topics": [
+        "batch-rename",
+        "cpp",
+        "gui",
+        "renamer",
+        "short-drama",
+        "single-exe",
+        "video-tools",
+        "win32",
+        "windows"
+      ],
+      "pushed_at": "2026-10-29T13:28:56Z",
+      "updated_at": "2026-10-29T13:28:59Z",
+      "created_at": "2026-10-21T08:53:19Z",
+      "fork": false,
+      "archived": false,
+      "license": "MIT"
+    },
+    {
+      "name": "codex-antigravity-bridge",
+      "description": "Let Codex supervise Google Antigravity agents through MCP with scoped tasks, plan-driven workflows, and parallel Git worktrees.",
+      "html_url": "https://github.com/crazyzhang277/codex-antigravity-bridge",
+      "default_branch": "main",
+      "homepage": "",
+      "language": "Python",
+      "stargazers_count": 7,
+      "forks_count": 3,
+      "watchers_count": 7,
+      "open_issues_count": 0,
+      "topics": [
+        "agy",
+        "ai-agent",
+        "antigravity",
+        "codex",
+        "coding-agent",
+        "developer-tools",
+        "git-worktree",
+        "mcp",
+        "multi-agent",
+        "python"
+      ],
+      "pushed_at": "2026-08-09T08:50:08Z",
+      "updated_at": "2026-10-29T05:21:31Z",
+      "created_at": "2026-08-05T10:49:31Z",
+      "fork": false,
+      "archived": false,
+      "license": "Apache-2.0"
+    },
+    {
+      "name": "github-trending",
+      "description": "实时展示 GitHub Trending 项目的现代化 Web 应用",
+      "html_url": "https://github.com/crazyzhang277/github-trending",
+      "default_branch": "master",
+      "homepage": "",
+      "language": "TypeScript",
+      "stargazers_count": 0,
+      "forks_count": 0,
+      "watchers_count": 0,
+      "open_issues_count": 0,
+      "topics": [],
+      "pushed_at": "2026-11-19T01:31:44Z",
+      "updated_at": "2026-10-18T07:15:35Z",
+      "created_at": "2026-10-18T06:49:28Z",
+      "fork": false,
+      "archived": false,
+      "license": null
+    },
+    {
+      "name": "MusicMP3",
+      "description": "一键将加密的音乐格式转换成mp3格式。",
+      "html_url": "https://github.com/crazyzhang277/MusicMP3",
+      "default_branch": "master",
+      "homepage": "",
+      "language": "C++",
+      "stargazers_count": 1,
+      "forks_count": 0,
+      "watchers_count": 1,
+      "open_issues_count": 0,
+      "topics": [],
+      "pushed_at": "2026-09-10T12:02:51Z",
+      "updated_at": "2026-09-10T12:03:38Z",
+      "created_at": "2026-09-06T15:33:33Z",
+      "fork": false,
+      "archived": false,
+      "license": "MIT"
+    },
+    {
+      "name": "clash-verge-sub-sync",
+      "description": null,
+      "html_url": "https://github.com/crazyzhang277/clash-verge-sub-sync",
+      "default_branch": "main",
+      "homepage": "",
+      "language": "Python",
+      "stargazers_count": 0,
+      "forks_count": 0,
+      "watchers_count": 0,
+      "open_issues_count": 0,
+      "topics": [],
+      "pushed_at": "2026-08-14T15:02:59Z",
+      "updated_at": "2026-08-14T15:06:42Z",
+      "created_at": "2026-08-13T03:59:08Z",
+      "fork": false,
+      "archived": false,
+      "license": null
+    },
+    {
+      "name": "my-food-web",
+      "description": null,
+      "html_url": "https://github.com/crazyzhang277/my-food-web",
+      "default_branch": "main",
+      "homepage": "",
+      "language": "JavaScript",
+      "stargazers_count": 0,
+      "forks_count": 0,
+      "watchers_count": 0,
+      "open_issues_count": 0,
+      "topics": [],
+      "pushed_at": "2026-08-12T16:06:43Z",
+      "updated_at": "2026-08-12T16:07:32Z",
+      "created_at": "2026-08-12T10:14:48Z",
+      "fork": false,
+      "archived": false,
+      "license": null
+    },
+    {
+      "name": "zhangzihao-resume",
+      "description": null,
+      "html_url": "https://github.com/crazyzhang277/zhangzihao-resume",
+      "default_branch": "main",
+      "homepage": "https://zhangzihao-resume.pages.dev/",
+      "language": "TypeScript",
+      "stargazers_count": 0,
+      "forks_count": 0,
+      "watchers_count": 0,
+      "open_issues_count": 0,
+      "topics": [],
+      "pushed_at": "2026-08-12T05:50:10Z",
+      "updated_at": "2026-08-12T05:51:15Z",
+      "created_at": "2026-07-22T05:37:19Z",
+      "fork": false,
+      "archived": false,
+      "license": null
+    },
+    {
+      "name": "zhangzihao-signal-archive",
+      "description": null,
+      "html_url": "https://github.com/crazyzhang277/zhangzihao-signal-archive",
+      "default_branch": "master",
+      "homepage": "",
+      "language": "CSS",
+      "stargazers_count": 0,
+      "forks_count": 0,
+      "watchers_count": 0,
+      "open_issues_count": 0,
+      "topics": [],
+      "pushed_at": "2026-08-08T12:18:19Z",
+      "updated_at": "2026-08-08T12:18:26Z",
+      "created_at": "2026-08-08T10:53:11Z",
+      "fork": false,
+      "archived": false,
+      "license": null
+    },
+    {
+      "name": "520-Prank-Review",
+      "description": "520-Prank-Review",
+      "html_url": "https://github.com/crazyzhang277/520-Prank-Review",
+      "default_branch": "main",
+      "homepage": "https://crazyzhang277.github.io/520-Prank-Review/",
+      "language": "HTML",
+      "stargazers_count": 0,
+      "forks_count": 0,
+      "watchers_count": 0,
+      "open_issues_count": 0,
+      "topics": [],
+      "pushed_at": "2026-07-27T06:45:38Z",
+      "updated_at": "2026-07-27T06:49:22Z",
+      "created_at": "2026-05-18T06:01:00Z",
+      "fork": false,
+      "archived": false,
+      "license": "MIT"
+    },
+    {
+      "name": "SnapBatchPro",
+      "description": "一个简单的批量提取视频帧工具",
+      "html_url": "https://github.com/crazyzhang277/SnapBatchPro",
+      "default_branch": "master",
+      "homepage": "",
+      "language": "Python",
+      "stargazers_count": 0,
+      "forks_count": 0,
+      "watchers_count": 0,
+      "open_issues_count": 0,
+      "topics": [],
+      "pushed_at": "2026-07-22T09:46:20Z",
+      "updated_at": "2026-07-22T09:47:52Z",
+      "created_at": "2026-05-20T15:58:24Z",
+      "fork": false,
+      "archived": false,
+      "license": "MIT"
+    }
+  ],
+  "events": [
+    {
+      "id": "20510011663",
+      "type": "ReleaseEvent",
+      "repo": "crazyzhang277/short-drama-bgm",
+      "created_at": "2026-11-18T11:40:36Z",
+      "payload": {
+        "ref": null,
+        "ref_type": null,
+        "size": null,
+        "commits": []
+      }
+    },
+    {
+      "id": "20488900299",
+      "type": "WatchEvent",
+      "repo": "cloudflare/security-audit-skill",
+      "created_at": "2026-11-18T07:35:45Z",
+      "payload": {
+        "ref": null,
+        "ref_type": null,
+        "size": null,
+        "commits": []
+      }
+    },
+    {
+      "id": "20360427698",
+      "type": "WatchEvent",
+      "repo": "heygen-com/hyperframes",
+      "created_at": "2026-11-17T06:44:49Z",
+      "payload": {
+        "ref": null,
+        "ref_type": null,
+        "size": null,
+        "commits": []
+      }
+    },
+    {
+      "id": "20360410858",
+      "type": "WatchEvent",
+      "repo": "pingdotgg/t3code",
+      "created_at": "2026-11-17T06:44:36Z",
+      "payload": {
+        "ref": null,
+        "ref_type": null,
+        "size": null,
+        "commits": []
+      }
+    },
+    {
+      "id": "20242361004",
+      "type": "WatchEvent",
+      "repo": "anthropics/skills",
+      "created_at": "2026-11-16T08:11:33Z",
+      "payload": {
+        "ref": null,
+        "ref_type": null,
+        "size": null,
+        "commits": []
+      }
+    },
+    {
+      "id": "20223039358",
+      "type": "WatchEvent",
+      "repo": "D4Vinci/Scrapling",
+      "created_at": "2026-11-16T03:10:01Z",
+      "payload": {
+        "ref": null,
+        "ref_type": null,
+        "size": null,
+        "commits": []
+      }
+    },
+    {
+      "id": "20223003559",
+      "type": "WatchEvent",
+      "repo": "vercel-labs/agent-desktop",
+      "created_at": "2026-11-16T03:09:23Z",
+      "payload": {
+        "ref": null,
+        "ref_type": null,
+        "size": null,
+        "commits": []
+      }
+    },
+    {
+      "id": "27150027616",
+      "type": "PushEvent",
+      "repo": "crazyzhang277/short-drama-bgm",
+      "created_at": "2026-11-12T16:49:35Z",
+      "payload": {
+        "ref": "refs/heads/main",
+        "ref_type": null,
+        "size": null,
+        "commits": []
+      }
+    },
+    {
+      "id": "27137728011",
+      "type": "PushEvent",
+      "repo": "crazyzhang277/short-drama-bgm",
+      "created_at": "2026-11-12T17:36:32Z",
+      "payload": {
+        "ref": "refs/heads/main",
+        "ref_type": null,
+        "size": null,
+        "commits": []
+      }
+    },
+    {
+      "id": "27072052775",
+      "type": "PushEvent",
+      "repo": "crazyzhang277/short-drama-bgm",
+      "created_at": "2026-11-12T02:56:57Z",
+      "payload": {
+        "ref": "refs/heads/main",
+        "ref_type": null,
+        "size": null,
+        "commits": []
+      }
+    },
+    {
+      "id": "27064525899",
+      "type": "PushEvent",
+      "repo": "crazyzhang277/short-drama-bgm",
+      "created_at": "2026-11-12T02:34:49Z",
+      "payload": {
+        "ref": "refs/heads/main",
+        "ref_type": null,
+        "size": null,
+        "commits": []
+      }
+    },
+    {
+      "id": "19923383511",
+      "type": "ReleaseEvent",
+      "repo": "crazyzhang277/short-drama-bgm",
+      "created_at": "2026-11-12T17:40:49Z",
+      "payload": {
+        "ref": null,
+        "ref_type": null,
+        "size": null,
+        "commits": []
+      }
+    },
+    {
+      "id": "19918095485",
+      "type": "ReleaseEvent",
+      "repo": "crazyzhang277/short-drama-bgm",
+      "created_at": "2026-11-12T16:53:09Z",
+      "payload": {
+        "ref": null,
+        "ref_type": null,
+        "size": null,
+        "commits": []
+      }
+    },
+    {
+      "id": "26910494149",
+      "type": "PushEvent",
+      "repo": "crazyzhang277/short-drama-bgm",
+      "created_at": "2026-11-11T02:08:03Z",
+      "payload": {
+        "ref": "refs/heads/main",
+        "ref_type": null,
+        "size": null,
+        "commits": []
+      }
+    },
+    {
+      "id": "26898905323",
+      "type": "PushEvent",
+      "repo": "crazyzhang277/short-drama-bgm",
+      "created_at": "2026-11-12T02:43:10Z",
+      "payload": {
+        "ref": "refs/heads/main",
+        "ref_type": null,
+        "size": null,
+        "commits": []
+      }
+    }
+  ]
+}

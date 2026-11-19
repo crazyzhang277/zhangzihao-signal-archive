@@ -3,6 +3,8 @@ name: Deploy static site to GitHub Pages
 on:
   push:
     branches: ["master"]
+  schedule:
+    - cron: "0 */6 * * *"
   workflow_dispatch:
 
 permissions:
@@ -23,6 +25,98 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Refresh GitHub snapshot
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_OWNER: ${{ github.repository_owner }}
+        run: |
+          mkdir -p data
+          python3 - <<'PY'
+          import json, os, urllib.request
+          from datetime import datetime, timezone
+
+          owner = os.environ.get("GITHUB_OWNER", "crazyzhang277")
+          token = os.environ.get("GH_TOKEN", "")
+          headers = {
+              "User-Agent": "signal-archive-actions",
+              "Accept": "application/vnd.github+json",
+          }
+          if token:
+              headers["Authorization"] = f"Bearer {token}"
+
+          def fetch(url):
+              req = urllib.request.Request(url, headers=headers)
+              with urllib.request.urlopen(req, timeout=20) as resp:
+                  return json.loads(resp.read().decode("utf-8"))
+
+          try:
+              user = fetch(f"https://api.github.com/users/{owner}")
+              repos = fetch(f"https://api.github.com/users/{owner}/repos?per_page=100&sort=updated")
+              try:
+                  events = fetch(f"https://api.github.com/users/{owner}/events/public?per_page=20")
+              except Exception:
+                  events = []
+
+              snapshot = {
+                  "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                  "user": {
+                      "login": user.get("login"),
+                      "name": user.get("name"),
+                      "avatar_url": user.get("avatar_url"),
+                      "html_url": user.get("html_url"),
+                      "bio": user.get("bio"),
+                      "public_repos": user.get("public_repos"),
+                      "followers": user.get("followers"),
+                      "following": user.get("following"),
+                  },
+                  "repos": [
+                      {
+                          "name": r.get("name"),
+                          "description": r.get("description"),
+                          "html_url": r.get("html_url"),
+                          "default_branch": r.get("default_branch"),
+                          "homepage": r.get("homepage") or "",
+                          "language": r.get("language"),
+                          "stargazers_count": r.get("stargazers_count", 0),
+                          "forks_count": r.get("forks_count", 0),
+                          "watchers_count": r.get("watchers_count", 0),
+                          "open_issues_count": r.get("open_issues_count", 0),
+                          "topics": r.get("topics") or [],
+                          "pushed_at": r.get("pushed_at"),
+                          "updated_at": r.get("updated_at"),
+                          "created_at": r.get("created_at"),
+                          "fork": bool(r.get("fork")),
+                          "archived": bool(r.get("archived")),
+                          "license": (r.get("license") or {}).get("spdx_id") if r.get("license") else None,
+                      }
+                      for r in repos
+                  ],
+                  "events": [
+                      {
+                          "id": e.get("id"),
+                          "type": e.get("type"),
+                          "repo": (e.get("repo") or {}).get("name"),
+                          "created_at": e.get("created_at"),
+                          "payload": {
+                              "ref": (e.get("payload") or {}).get("ref"),
+                              "ref_type": (e.get("payload") or {}).get("ref_type"),
+                              "size": (e.get("payload") or {}).get("size"),
+                              "commits": [
+                                  {"message": c.get("message", "").splitlines()[0]}
+                                  for c in ((e.get("payload") or {}).get("commits") or [])[:2]
+                              ],
+                          },
+                      }
+                      for e in events[:15]
+                  ],
+              }
+              with open("data/github-snapshot.json", "w", encoding="utf-8") as f:
+                  json.dump(snapshot, f, ensure_ascii=False, indent=2)
+              print("Updated snapshot:", len(snapshot["repos"]), "repos")
+          except Exception as exc:
+              print("Keeping existing snapshot due to error:", exc)
+          PY
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
