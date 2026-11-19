@@ -1,7 +1,9 @@
 const USERNAME = "crazyzhang277";
 const API_ROOT = "https://api.github.com";
 const UNGH_ROOT = "https://ungh.cc";
+const JSDELIVR_ROOT = "https://cdn.jsdelivr.net/gh";
 const SNAPSHOT_URL = "./data/github-snapshot.json";
+const READMES_SNAPSHOT_URL = "./data/readmes.json";
 const CACHE_KEY = "signal-archive:cache:v2";
 const BOOKMARKS_KEY = "signal-archive:bookmarks:v1";
 const THEME_KEY = "signal-archive:theme";
@@ -237,6 +239,10 @@ const state = {
   detailRepo: null,
   starPolling: null,
   toastTimer: null,
+  readmeCache: new Map(),
+  snapshotReadmes: null,
+  snapshotReadmesPromise: null,
+  githubApiBlockedUntil: 0,
 };
 
 const elements = {
@@ -598,30 +604,111 @@ function renderStackSection() {
 }
 
 function formatEventDescription(event) {
-  const repoFullName = event.repo?.name || event.repo || "";
-  const repoShort = repoFullName.split("/").pop() || repoFullName;
+  const repoFullName = String(event.repo?.name || event.repo || "").trim();
+  const [repoOwner = "", repoNameOnly = ""] = repoFullName.split("/");
+  const repoShort = repoNameOnly || repoFullName;
+  const isOwnRepo = repoOwner
+    ? repoOwner.toLowerCase() === USERNAME.toLowerCase()
+    : Boolean(repoShort && state.repos.some((item) => item.name.toLowerCase() === repoShort.toLowerCase()));
+  const displayRepo = isOwnRepo ? repoShort : repoFullName || repoShort;
+  const safeRepoPath = repoFullName
+    .split("/")
+    .filter(Boolean)
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
+  const repoUrl = safeRepoPath
+    ? "https://github.com/" + safeRepoPath
+    : "https://github.com/" + USERNAME;
   const payload = event.payload || {};
+
   if (event.type === "PushEvent") {
     const branch = String(payload.ref || "main").replace("refs/heads/", "");
     const commitMsg = payload.commits?.[0]?.message;
     return {
+      repoFullName,
       repoShort,
+      displayRepo,
+      isOwnRepo,
+      repoUrl,
       badge: "PUSH · " + branch,
       detail: commitMsg ? commitMsg : "向 " + branch + " 分支推送更新",
     };
   }
   if (event.type === "CreateEvent") {
     return {
+      repoFullName,
       repoShort,
+      displayRepo,
+      isOwnRepo,
+      repoUrl,
       badge: "CREATE · " + String(payload.ref_type || "repo").toUpperCase(),
       detail: payload.ref ? "创建分支或标签 " + payload.ref : "初始化仓库",
     };
   }
+  if (event.type === "ReleaseEvent") {
+    const tag = payload.release?.tag_name || payload.release?.name || "";
+    return {
+      repoFullName,
+      repoShort,
+      displayRepo,
+      isOwnRepo,
+      repoUrl,
+      badge: tag ? "RELEASE · " + tag : "RELEASE",
+      detail: tag ? "发布版本 " + tag : "发布新的 Release 版本",
+    };
+  }
   if (event.type === "WatchEvent") {
-    return { repoShort, badge: "STARRED", detail: "收到或点亮 Star 信号" };
+    return {
+      repoFullName,
+      repoShort,
+      displayRepo,
+      isOwnRepo,
+      repoUrl,
+      badge: "STARRED",
+      detail: isOwnRepo ? "仓库收到或点亮 Star 信号" : "Star 了开源项目 " + (repoFullName || repoShort),
+    };
+  }
+  if (event.type === "ForkEvent") {
+    return {
+      repoFullName,
+      repoShort,
+      displayRepo,
+      isOwnRepo,
+      repoUrl,
+      badge: "FORK",
+      detail: "Fork 了仓库 " + (repoFullName || repoShort),
+    };
+  }
+  if (event.type === "PullRequestEvent") {
+    const action = payload.action || "updated";
+    return {
+      repoFullName,
+      repoShort,
+      displayRepo,
+      isOwnRepo,
+      repoUrl,
+      badge: "PR · " + String(action).toUpperCase(),
+      detail: payload.pull_request?.title || "Pull Request 动态更新",
+    };
+  }
+  if (event.type === "IssuesEvent") {
+    const action = payload.action || "updated";
+    return {
+      repoFullName,
+      repoShort,
+      displayRepo,
+      isOwnRepo,
+      repoUrl,
+      badge: "ISSUE · " + String(action).toUpperCase(),
+      detail: payload.issue?.title || "Issue 动态更新",
+    };
   }
   return {
+    repoFullName,
     repoShort,
+    displayRepo,
+    isOwnRepo,
+    repoUrl,
     badge: String(event.type || "EVENT").replace(/Event$/, "").toUpperCase(),
     detail: "GitHub 仓库公开动态更新",
   };
@@ -636,13 +723,15 @@ function renderTimeline() {
       .slice(0, 10)
       .map((event) => {
         const info = formatEventDescription(event);
-        const matchingRepo = state.repos.find((item) => item.name === info.repoShort);
-        const repoUrl = matchingRepo ? matchingRepo.html_url : "https://github.com/" + USERNAME + "/" + encodeURIComponent(info.repoShort);
+        const matchingRepo = info.isOwnRepo
+          ? state.repos.find((item) => item.name.toLowerCase() === info.repoShort.toLowerCase())
+          : null;
+        const repoUrl = matchingRepo ? matchingRepo.html_url : info.repoUrl;
         return (
           '<div class="timeline-item">' +
           '<span class="timeline-date">' + escapeHtml(formatDate(event.created_at)) + "</span>" +
           '<div class="timeline-main">' +
-          '<div class="timeline-title-row"><h3>' + escapeHtml(info.repoShort) + '</h3><span class="timeline-badge">' + escapeHtml(info.badge) + "</span></div>" +
+          '<div class="timeline-title-row"><h3>' + escapeHtml(info.displayRepo) + '</h3><span class="timeline-badge">' + escapeHtml(info.badge) + "</span></div>" +
           "<p>" + escapeHtml(info.detail) + "</p>" +
           "</div>" +
           '<div class="timeline-actions">' +
@@ -704,53 +793,51 @@ function observeReveals() {
   });
 }
 
-function bindDynamicHandlers() {
-  document.querySelectorAll("[data-filter]").forEach((button) => {
-    button.addEventListener("click", () => {
-      state.filter = button.dataset.filter;
-      renderFilters();
-      renderProjects();
-      bindDynamicHandlers();
-      observeReveals();
-    });
-  });
-
-  document.querySelectorAll("[data-repo]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const repo = state.repos.find((item) => item.name === button.dataset.repo);
-      if (repo) openProjectDialog(repo);
-    });
-  });
-
-  document.querySelectorAll("[data-bookmark]").forEach((button) => {
-    button.addEventListener("click", (event) => {
+function bindDelegatedHandlers() {
+  document.addEventListener("click", (event) => {
+    const bookmarkBtn = event.target.closest("[data-bookmark]");
+    if (bookmarkBtn) {
       event.stopPropagation();
-      toggleBookmark(button.dataset.bookmark);
-    });
-  });
+      toggleBookmark(bookmarkBtn.dataset.bookmark);
+      return;
+    }
 
-  document.querySelectorAll("[data-jump-lang]").forEach((button) => {
-    button.addEventListener("click", () => {
-      state.filter = button.dataset.jumpLang;
+    const filterBtn = event.target.closest("[data-filter]");
+    if (filterBtn) {
+      state.filter = filterBtn.dataset.filter;
       renderFilters();
       renderProjects();
-      bindDynamicHandlers();
+      observeReveals();
+      return;
+    }
+
+    const repoBtn = event.target.closest("[data-repo]");
+    if (repoBtn) {
+      const repo = state.repos.find((item) => item.name === repoBtn.dataset.repo);
+      if (repo) openProjectDialog(repo);
+      return;
+    }
+
+    const langBtn = event.target.closest("[data-jump-lang]");
+    if (langBtn) {
+      state.filter = langBtn.dataset.jumpLang;
+      renderFilters();
+      renderProjects();
       observeReveals();
       document.querySelector("#projects").scrollIntoView({ behavior: "smooth" });
-    });
-  });
+      return;
+    }
 
-  document.querySelectorAll("[data-jump-topic]").forEach((button) => {
-    button.addEventListener("click", () => {
+    const topicBtn = event.target.closest("[data-jump-topic]");
+    if (topicBtn) {
       state.filter = "All";
-      state.query = button.dataset.jumpTopic;
+      state.query = topicBtn.dataset.jumpTopic;
       elements.projectSearch.value = state.query;
       renderFilters();
       renderProjects();
-      bindDynamicHandlers();
       observeReveals();
       document.querySelector("#projects").scrollIntoView({ behavior: "smooth" });
-    });
+    }
   });
 }
 
@@ -762,7 +849,6 @@ function render() {
   renderStackSection();
   renderTimeline();
   elements.currentYear.textContent = new Date().getFullYear();
-  bindDynamicHandlers();
   observeReveals();
 }
 
@@ -802,7 +888,6 @@ function resetAllFilters() {
   elements.toggleSavedOnly.setAttribute("aria-pressed", "false");
   renderFilters();
   renderProjects();
-  bindDynamicHandlers();
   observeReveals();
 }
 
@@ -923,7 +1008,10 @@ function renderReadmeInline(value, repo) {
     .replace(/__([^_]+)__/g, "<strong>$1</strong>")
     .replace(/~~([^~]+)~~/g, "<del>$1</del>")
     .replace(/\*([^*]+)\*/g, "<em>$1</em>");
-  return text.replace(/\u0000(\d+)\u0000/g, (match, index) => tokens[Number(index)]);
+  for (let pass = 0; pass < 4 && /\u0000\d+\u0000/.test(text); pass += 1) {
+    text = text.replace(/\u0000(\d+)\u0000/g, (match, index) => tokens[Number(index)] ?? "");
+  }
+  return text;
 }
 
 function renderReadmeFallback(raw, repo) {
@@ -1047,6 +1135,20 @@ function enhanceCodeBlocks() {
   });
 }
 
+function attachReadmeImageFallbacks() {
+  elements.readmeContent.querySelectorAll("img").forEach((img) => {
+    img.addEventListener("error", () => {
+      if (img.dataset.fallbackTried) return;
+      const rawMatch = img.src.match(/^https:\/\/raw\.githubusercontent\.com\/([^/]+)\/([^/]+)\/([^/]+)\/(.+)$/);
+      const ghRawMatch = img.src.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)\/raw\/([^/]+)\/(.+)$/);
+      const match = rawMatch || ghRawMatch;
+      if (!match) return;
+      img.dataset.fallbackTried = "1";
+      img.src = JSDELIVR_ROOT + "/" + match[1] + "/" + match[2] + "@" + match[3] + "/" + match[4];
+    });
+  });
+}
+
 function renderReadme(html) {
   elements.readmeContent.innerHTML = "";
   const safeHtml = sanitizeReadmeHtml(html);
@@ -1055,59 +1157,202 @@ function renderReadme(html) {
     return;
   }
   elements.readmeContent.innerHTML = safeHtml;
+  attachReadmeImageFallbacks();
   enhanceCodeBlocks();
 }
 
+function isValidReadmeText(value) {
+  if (typeof value !== "string") return false;
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  if (/^(?:<!doctype\s+html|<html\b)/i.test(trimmed)) return false;
+  if (trimmed.startsWith("{")) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (
+        parsed &&
+        typeof parsed === "object" &&
+        !Array.isArray(parsed) &&
+        (parsed.error === true ||
+          typeof parsed.status === "number" ||
+          typeof parsed.statusCode === "number" ||
+          (typeof parsed.message === "string" && Object.keys(parsed).length <= 4))
+      ) {
+        return false;
+      }
+    } catch (error) {
+      // Not a JSON error object; treat as normal Markdown/text.
+    }
+  }
+  return true;
+}
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = 6000) {
+  if (options.signal || typeof AbortController === "undefined") {
+    return fetch(url, options);
+  }
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
+async function loadSnapshotReadmes() {
+  if (state.snapshotReadmes) return state.snapshotReadmes;
+  if (!state.snapshotReadmesPromise) {
+    state.snapshotReadmesPromise = fetchJson(READMES_SNAPSHOT_URL)
+      .then((payload) => {
+        state.snapshotReadmes = payload?.readmes && typeof payload.readmes === "object" ? payload.readmes : {};
+        return state.snapshotReadmes;
+      })
+      .catch(() => {
+        state.snapshotReadmesPromise = null;
+        return {};
+      });
+  }
+  return state.snapshotReadmesPromise;
+}
+
+async function fetchReadmeFromBaseUrls(urls) {
+  let sawError = false;
+  let allMissing = urls.length > 0;
+  for (const url of urls) {
+    try {
+      const response = await fetchWithTimeout(url, {}, 5500);
+      if (response.ok) {
+        const text = await response.text();
+        if (isValidReadmeText(text)) {
+          return { markdown: text, confirmedMissing: false, hadError: false };
+        }
+        sawError = true;
+        allMissing = false;
+      } else if (response.status !== 404) {
+        sawError = true;
+        allMissing = false;
+      }
+    } catch (error) {
+      sawError = true;
+      allMissing = false;
+    }
+  }
+  return { markdown: "", confirmedMissing: allMissing && !sawError, hadError: sawError };
+}
+
 async function loadReadme(repo) {
+  const cached = state.readmeCache.get(repo.name);
+  if (cached) {
+    if (cached.missing) {
+      elements.readmeContent.innerHTML = "<p>这个项目没有 README 文件，可以直接打开 GitHub 查看仓库文件。</p>";
+      elements.readmeState.textContent = "NO README";
+      return;
+    }
+    renderReadme(cached.html);
+    elements.readmeState.textContent = cached.stateLabel;
+    return;
+  }
+
   elements.readmeState.textContent = "LOADING";
   elements.readmeContent.innerHTML = "<p>正在读取 README.md …</p>";
   try {
     let rawMarkdown = "";
+    let sourceOrigin = "LIVE";
     let confirmedMissing = false;
     let hadNetworkError = false;
-    try {
-      const readmeResponse = await fetch(API_ROOT + "/repos/" + USERNAME + "/" + encodeURIComponent(repo.name) + "/readme", {
-        headers: { Accept: "application/vnd.github.raw+json" },
-      });
-      if (readmeResponse.ok) rawMarkdown = await readmeResponse.text();
-      else if (readmeResponse.status === 404) confirmedMissing = true;
-      else hadNetworkError = true;
-    } catch (error) {
+
+    if (Date.now() >= state.githubApiBlockedUntil) {
+      try {
+        const readmeResponse = await fetchWithTimeout(
+          API_ROOT + "/repos/" + USERNAME + "/" + encodeURIComponent(repo.name) + "/readme",
+          { headers: { Accept: "application/vnd.github.raw+json" } },
+          6000
+        );
+        if (readmeResponse.ok) {
+          const text = await readmeResponse.text();
+          if (isValidReadmeText(text)) rawMarkdown = text;
+          else hadNetworkError = true;
+        } else if (readmeResponse.status === 404) {
+          confirmedMissing = true;
+        } else {
+          if (readmeResponse.status === 403 || readmeResponse.status === 429) {
+            state.githubApiBlockedUntil = Date.now() + 5 * 60 * 1000;
+          }
+          hadNetworkError = true;
+        }
+      } catch (error) {
+        hadNetworkError = true;
+      }
+    } else {
       hadNetworkError = true;
     }
 
-    if (!rawMarkdown.trim()) {
+    const encodedRepo = encodeURIComponent(repo.name);
+    const branchCandidates = repo.default_branch ? [repo.default_branch] : ["main", "master"];
+    const readmeFilenames = ["README.md", "readme.md", "Readme.md", "README.markdown"];
+
+    if (!rawMarkdown && !confirmedMissing) {
+      const jsdelivrUrls = [];
+      branchCandidates.forEach((branch) => {
+        const encodedBranch = encodeURIComponent(branch).replace(/%2F/gi, "/");
+        readmeFilenames.forEach((filename) => {
+          jsdelivrUrls.push(JSDELIVR_ROOT + "/" + USERNAME + "/" + encodedRepo + "@" + encodedBranch + "/" + filename);
+        });
+      });
+      const cdnResult = await fetchReadmeFromBaseUrls(jsdelivrUrls);
+      if (cdnResult.markdown) rawMarkdown = cdnResult.markdown;
+      else if (cdnResult.hadError) hadNetworkError = true;
+    }
+
+    if (!rawMarkdown && !confirmedMissing) {
+      const rawUrls = [];
+      branchCandidates.forEach((branch) => {
+        const encodedBranch = encodeURIComponent(branch).replace(/%2F/gi, "/");
+        readmeFilenames.forEach((filename) => {
+          rawUrls.push("https://raw.githubusercontent.com/" + USERNAME + "/" + encodedRepo + "/" + encodedBranch + "/" + filename);
+        });
+      });
+      const rawResult = await fetchReadmeFromBaseUrls(rawUrls);
+      if (rawResult.markdown) rawMarkdown = rawResult.markdown;
+      else if (rawResult.confirmedMissing && !hadNetworkError) confirmedMissing = true;
+      else if (rawResult.hadError) hadNetworkError = true;
+    }
+
+    if (!rawMarkdown && !confirmedMissing) {
       try {
-        const unghReadme = await fetchJson(UNGH_ROOT + "/repos/" + USERNAME + "/" + encodeURIComponent(repo.name) + "/readme");
-        if (unghReadme?.markdown) rawMarkdown = unghReadme.markdown;
+        const unghReadme = await fetchJson(UNGH_ROOT + "/repos/" + USERNAME + "/" + encodedRepo + "/readme", {}, 6000);
+        if (!unghReadme?.error && isValidReadmeText(unghReadme?.markdown)) {
+          rawMarkdown = unghReadme.markdown;
+        } else {
+          hadNetworkError = true;
+        }
       } catch (error) {
         hadNetworkError = true;
       }
     }
 
-    if (!rawMarkdown.trim()) {
-      const branch = encodeURIComponent(repo.default_branch || "HEAD").replace(/%2F/gi, "/");
-      for (const filename of ["README.md", "readme.md", "Readme.md", "README.markdown"]) {
-        try {
-          const rawResponse = await fetch("https://raw.githubusercontent.com/" + USERNAME + "/" + encodeURIComponent(repo.name) + "/" + branch + "/" + filename);
-          if (rawResponse.ok) {
-            rawMarkdown = await rawResponse.text();
-            if (rawMarkdown.trim()) break;
-          } else if (rawResponse.status === 404) {
-            confirmedMissing = true;
-          } else {
-            hadNetworkError = true;
-          }
-        } catch (error) {
-          hadNetworkError = true;
+    if (!rawMarkdown) {
+      const snapshotReadmes = await loadSnapshotReadmes();
+      if (Object.prototype.hasOwnProperty.call(snapshotReadmes, repo.name)) {
+        const snapshotText = snapshotReadmes[repo.name];
+        if (snapshotText === null) {
+          confirmedMissing = true;
+          hadNetworkError = false;
+        } else if (isValidReadmeText(snapshotText)) {
+          rawMarkdown = snapshotText;
+          sourceOrigin = "SNAPSHOT";
         }
       }
     }
 
-    if (!rawMarkdown.trim()) {
+    if (state.detailRepo !== repo) return;
+
+    if (!rawMarkdown) {
       if (confirmedMissing && !hadNetworkError) {
         elements.readmeContent.innerHTML = "<p>这个项目没有 README 文件，可以直接打开 GitHub 查看仓库文件。</p>";
         elements.readmeState.textContent = "NO README";
+        state.readmeCache.set(repo.name, { missing: true });
       } else {
         elements.readmeContent.innerHTML = "<p>暂时无法连接 GitHub 读取 README，可直接点击左侧「在 GitHub 查看」按钮浏览文档。</p>";
         elements.readmeState.textContent = "OPEN GITHUB";
@@ -1115,66 +1360,94 @@ async function loadReadme(repo) {
       return;
     }
 
-    try {
-      const markdownResponse = await fetch(API_ROOT + "/markdown", {
-        method: "POST",
-        headers: { Accept: "text/html", "Content-Type": "application/json" },
-        body: JSON.stringify({ text: rawMarkdown, mode: "gfm", context: USERNAME + "/" + repo.name }),
-      });
-      if (markdownResponse.ok) {
-        renderReadme(await markdownResponse.text());
-        elements.readmeState.textContent = "LIVE / GFM";
-        return;
+    if (Date.now() >= state.githubApiBlockedUntil) {
+      try {
+        const markdownResponse = await fetchWithTimeout(
+          API_ROOT + "/markdown",
+          {
+            method: "POST",
+            headers: { Accept: "text/html", "Content-Type": "application/json" },
+            body: JSON.stringify({ text: rawMarkdown, mode: "gfm", context: USERNAME + "/" + repo.name }),
+          },
+          4500
+        );
+        if (state.detailRepo !== repo) return;
+        if (markdownResponse.ok) {
+          const renderedHtml = await markdownResponse.text();
+          if (state.detailRepo !== repo) return;
+          const stateLabel = sourceOrigin + " / GFM";
+          renderReadme(renderedHtml);
+          elements.readmeState.textContent = stateLabel;
+          state.readmeCache.set(repo.name, { html: renderedHtml, stateLabel });
+          return;
+        }
+        if (markdownResponse.status === 403 || markdownResponse.status === 429) {
+          state.githubApiBlockedUntil = Date.now() + 5 * 60 * 1000;
+        }
+      } catch (error) {
+        // Fallback to local Markdown renderer.
       }
-    } catch (error) {
-      // Fallback to local Markdown renderer.
     }
 
-    renderReadme(renderReadmeFallback(rawMarkdown, repo));
-    elements.readmeState.textContent = "LIVE / LOCAL";
+    if (state.detailRepo !== repo) return;
+    const localHtml = renderReadmeFallback(rawMarkdown, repo);
+    const stateLabel = sourceOrigin + " / LOCAL";
+    renderReadme(localHtml);
+    elements.readmeState.textContent = stateLabel;
+    state.readmeCache.set(repo.name, { html: localHtml, stateLabel });
   } catch (error) {
+    if (state.detailRepo !== repo) return;
     elements.readmeContent.innerHTML = "<p>暂时无法读取 README，你可以点击左侧按钮前往 GitHub 查看。</p>";
     elements.readmeState.textContent = "OPEN GITHUB";
   }
 }
 
-async function fetchJson(url, options = {}) {
-  const response = await fetch(url, options);
-  if (!response.ok) throw new Error("Request failed: " + response.status);
+async function fetchJson(url, options = {}, timeoutMs = 8000) {
+  const response = await fetchWithTimeout(url, options, timeoutMs);
+  if (!response.ok) {
+    const err = new Error("Request failed: " + response.status);
+    err.status = response.status;
+    throw err;
+  }
   return response.json();
 }
 
 async function fetchRepoStats(repo) {
-  try {
-    const data = await fetchJson(API_ROOT + "/repos/" + USERNAME + "/" + encodeURIComponent(repo.name), {
-      headers: API_HEADERS,
-      cache: "no-store",
-    });
-    return { data, source: "GITHUB" };
-  } catch (githubError) {
+  if (Date.now() >= state.githubApiBlockedUntil) {
     try {
-      const ungh = await fetchJson(UNGH_ROOT + "/repos/" + USERNAME + "/" + encodeURIComponent(repo.name), {
+      const data = await fetchJson(API_ROOT + "/repos/" + USERNAME + "/" + encodeURIComponent(repo.name), {
+        headers: API_HEADERS,
         cache: "no-store",
       });
-      if (!ungh?.repo) throw githubError;
-      return {
-        data: {
-          stargazers_count: Number(ungh.repo.stars) || 0,
-          forks_count: Number(ungh.repo.forks) || 0,
-          pushed_at: ungh.repo.pushedAt || repo.pushed_at,
-          updated_at: ungh.repo.updatedAt || repo.updated_at,
-          default_branch: ungh.repo.defaultBranch || repo.default_branch,
-          description: ungh.repo.description ?? repo.description,
-        },
-        source: "UNGH",
-      };
-    } catch (unghError) {
-      const badgeUrl = "https://img.shields.io/github/stars/" + USERNAME + "/" + encodeURIComponent(repo.name) + ".json";
-      const badge = await fetchJson(badgeUrl, { cache: "no-store" });
-      const stargazersCount = parseStarCount(badge.value ?? badge.message);
-      if (!Number.isFinite(stargazersCount)) throw githubError;
-      return { data: { stargazers_count: stargazersCount }, source: "SHIELDS" };
+      return { data, source: "GITHUB" };
+    } catch (githubError) {
+      if (githubError?.status === 403 || githubError?.status === 429) {
+        state.githubApiBlockedUntil = Date.now() + 5 * 60 * 1000;
+      }
     }
+  }
+  try {
+    const ungh = await fetchJson(UNGH_ROOT + "/repos/" + USERNAME + "/" + encodeURIComponent(repo.name), {
+      cache: "no-store",
+    });
+    if (!ungh?.repo || ungh?.error) throw new Error("Invalid UNGH repo stats");
+    return {
+      data: {
+        stargazers_count: Number(ungh.repo.stars) || 0,
+        forks_count: Number(ungh.repo.forks) || 0,
+        pushed_at: ungh.repo.pushedAt || repo.pushed_at,
+        updated_at: ungh.repo.updatedAt || repo.updated_at,
+        default_branch: ungh.repo.defaultBranch || repo.default_branch,
+        description: ungh.repo.description ?? repo.description,
+      },
+      source: "UNGH",
+    };
+  } catch (unghError) {
+    const badgeUrl = "https://img.shields.io/github/stars/" + USERNAME + "/" + encodeURIComponent(repo.name) + ".json";
+    const badge = await fetchJson(badgeUrl, { cache: "no-store" });
+    const stargazersCount = parseStarCount(badge.value ?? badge.message);
+    if (!Number.isFinite(stargazersCount)) throw unghError;
+    return { data: { stargazers_count: stargazersCount }, source: "SHIELDS" };
   }
 }
 
@@ -1232,6 +1505,8 @@ function openProjectDialog(repo) {
   updateDialogBookmarkButton(repo.name);
   elements.dialogCloneCommand.textContent = "git clone " + repo.html_url + ".git";
   elements.projectDialog.showModal();
+  elements.projectDialog.scrollTop = 0;
+  elements.readmeContent.scrollTop = 0;
   loadReadme(repo);
   startStarPolling(repo);
 }
@@ -1343,6 +1618,9 @@ async function syncGitHubData(manual = false) {
   elements.syncStatus.textContent = "SYNCING";
 
   try {
+    if (!manual && Date.now() < state.githubApiBlockedUntil) {
+      throw new Error("GitHub API cooldown active");
+    }
     const [user, repos] = await Promise.all([
       fetchJson(API_ROOT + "/users/" + USERNAME, { headers: API_HEADERS }),
       fetchAllReposFromGitHub(),
@@ -1364,21 +1642,25 @@ async function syncGitHubData(manual = false) {
     render();
     if (manual) showToast("已同步最新 GitHub 仓库与 Star 数据");
   } catch (githubError) {
+    if (githubError?.status === 403 || githubError?.status === 429) {
+      state.githubApiBlockedUntil = Date.now() + 5 * 60 * 1000;
+    }
     try {
       const [unghUser, unghRepos] = await Promise.all([
         fetchJson(UNGH_ROOT + "/users/" + USERNAME),
         fetchJson(UNGH_ROOT + "/users/" + USERNAME + "/repos"),
       ]);
-      if (unghUser?.user) {
+      if (unghRepos?.error || !Array.isArray(unghRepos?.repos) || !unghRepos.repos.length) {
+        throw new Error("Invalid UNGH repos response");
+      }
+      if (unghUser?.user && !unghUser?.error) {
         state.user = {
           ...state.user,
           name: unghUser.user.name || state.user.name,
           avatar_url: unghUser.user.avatar || state.user.avatar_url,
         };
       }
-      if (Array.isArray(unghRepos?.repos) && unghRepos.repos.length) {
-        state.repos = mergeReposWithFallback(unghRepos.repos, state.repos);
-      }
+      state.repos = mergeReposWithFallback(unghRepos.repos, state.repos);
       state.sourceLabel = "UNGH MIRROR";
       elements.syncStatus.textContent = "MIRROR LIVE";
       elements.lastSync.textContent = "镜像同步";
@@ -1409,6 +1691,7 @@ function toggleTheme() {
 }
 
 // Event bindings
+bindDelegatedHandlers();
 elements.themeToggle.addEventListener("click", toggleTheme);
 elements.syncNowButton.addEventListener("click", () => syncGitHubData(true));
 elements.jumpStarredButton.addEventListener("click", () => {
@@ -1417,7 +1700,6 @@ elements.jumpStarredButton.addEventListener("click", () => {
   elements.projectSort.value = "stars";
   elements.toggleStarredOnly.setAttribute("aria-pressed", "true");
   renderProjects();
-  bindDynamicHandlers();
   observeReveals();
   document.querySelector("#projects").scrollIntoView({ behavior: "smooth" });
 });
@@ -1425,7 +1707,6 @@ elements.jumpStarredButton.addEventListener("click", () => {
 elements.projectSearch.addEventListener("input", (event) => {
   state.query = event.target.value;
   renderProjects();
-  bindDynamicHandlers();
   observeReveals();
 });
 
@@ -1434,14 +1715,12 @@ elements.clearSearch.addEventListener("click", () => {
   elements.projectSearch.value = "";
   elements.projectSearch.focus();
   renderProjects();
-  bindDynamicHandlers();
   observeReveals();
 });
 
 elements.projectSort.addEventListener("change", (event) => {
   state.sort = event.target.value;
   renderProjects();
-  bindDynamicHandlers();
   observeReveals();
 });
 
@@ -1449,7 +1728,6 @@ elements.toggleStarredOnly.addEventListener("click", () => {
   state.starredOnly = !state.starredOnly;
   elements.toggleStarredOnly.setAttribute("aria-pressed", String(state.starredOnly));
   renderProjects();
-  bindDynamicHandlers();
   observeReveals();
 });
 
@@ -1457,7 +1735,6 @@ elements.toggleDemoOnly.addEventListener("click", () => {
   state.demoOnly = !state.demoOnly;
   elements.toggleDemoOnly.setAttribute("aria-pressed", String(state.demoOnly));
   renderProjects();
-  bindDynamicHandlers();
   observeReveals();
 });
 
@@ -1465,7 +1742,6 @@ elements.toggleSavedOnly.addEventListener("click", () => {
   state.savedOnly = !state.savedOnly;
   elements.toggleSavedOnly.setAttribute("aria-pressed", String(state.savedOnly));
   renderProjects();
-  bindDynamicHandlers();
   observeReveals();
 });
 
@@ -1474,13 +1750,11 @@ elements.resetFiltersButton.addEventListener("click", resetAllFilters);
 elements.timelineModeEvents.addEventListener("click", () => {
   state.timelineMode = "events";
   renderTimeline();
-  bindDynamicHandlers();
 });
 
 elements.timelineModeRepos.addEventListener("click", () => {
   state.timelineMode = "repos";
   renderTimeline();
-  bindDynamicHandlers();
 });
 
 elements.closeDialog.addEventListener("click", () => elements.projectDialog.close());
@@ -1490,7 +1764,7 @@ elements.dialogBookmarkButton.addEventListener("click", () => {
 });
 elements.dialogShareButton.addEventListener("click", () => {
   if (!state.detailRepo) return;
-  const shareUrl = window.location.origin + window.location.pathname + "?repo=" + encodeURIComponent(state.detailRepo.name);
+  const shareUrl = new URL("?repo=" + encodeURIComponent(state.detailRepo.name), window.location.href).href;
   copyText(shareUrl, "已复制项目直达链接");
 });
 elements.copyCloneButton.addEventListener("click", () => {

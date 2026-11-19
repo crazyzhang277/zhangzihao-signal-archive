@@ -33,7 +33,7 @@ jobs:
         run: |
           mkdir -p data
           python3 - <<'PY'
-          import json, os, urllib.request
+          import json, os, urllib.error, urllib.request
           from datetime import datetime, timezone
 
           owner = os.environ.get("GITHUB_OWNER", "crazyzhang277")
@@ -49,6 +49,16 @@ jobs:
               req = urllib.request.Request(url, headers=headers)
               with urllib.request.urlopen(req, timeout=20) as resp:
                   return json.loads(resp.read().decode("utf-8"))
+
+          def fetch_readme(repo_name):
+              raw_headers = dict(headers)
+              raw_headers["Accept"] = "application/vnd.github.raw+json"
+              req = urllib.request.Request(
+                  f"https://api.github.com/repos/{owner}/{repo_name}/readme",
+                  headers=raw_headers,
+              )
+              with urllib.request.urlopen(req, timeout=20) as resp:
+                  return resp.read().decode("utf-8", errors="replace")
 
           try:
               user = fetch(f"https://api.github.com/users/{owner}")
@@ -114,6 +124,43 @@ jobs:
               with open("data/github-snapshot.json", "w", encoding="utf-8") as f:
                   json.dump(snapshot, f, ensure_ascii=False, indent=2)
               print("Updated snapshot:", len(snapshot["repos"]), "repos")
+
+              existing_readmes = {}
+              if os.path.exists("data/readmes.json"):
+                  try:
+                      with open("data/readmes.json", "r", encoding="utf-8") as f:
+                          existing_readmes = json.load(f).get("readmes") or {}
+                  except Exception:
+                      existing_readmes = {}
+
+              readmes = {}
+              for r in repos:
+                  name = r.get("name")
+                  if not name:
+                      continue
+                  try:
+                      content = fetch_readme(name)
+                      readmes[name] = content if content.strip() else None
+                  except urllib.error.HTTPError as err:
+                      if err.code == 404:
+                          readmes[name] = None
+                      elif name in existing_readmes:
+                          readmes[name] = existing_readmes[name]
+                  except Exception:
+                      if name in existing_readmes:
+                          readmes[name] = existing_readmes[name]
+
+              with open("data/readmes.json", "w", encoding="utf-8") as f:
+                  json.dump(
+                      {
+                          "generated_at": snapshot["generated_at"],
+                          "readmes": readmes,
+                      },
+                      f,
+                      ensure_ascii=False,
+                      indent=2,
+                  )
+              print("Updated readmes snapshot:", len(readmes), "entries")
           except Exception as exc:
               print("Keeping existing snapshot due to error:", exc)
           PY
